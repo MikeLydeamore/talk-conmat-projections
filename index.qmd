@@ -1,0 +1,374 @@
+---
+title: "`conmat`: Programmatic generation of synthetic contact matrices"
+author: M. J. Lydeamore
+date: today
+format:
+    presentation-revealjs+letterbox:
+        fig-align: center
+    presentation-beamer: default
+---
+
+```{css}
+figcaption {
+    text-align: center;
+}
+```
+
+```{r}
+#| label: load-packages
+
+library(knitr)
+library(ggplot2)
+library(conmat)
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(mgcv)
+library(patchwork)
+
+fit_list <- readRDS("data/fit_list.rds")
+```
+
+## What are contact matrices
+
+## Contact diary studies
+
+Contact diary studies follow individuals and ask them:
+
+* how many contacts of a certain type, 
+* the duration of contact,
+* the location of the contact,
+* the frequency of the contact
+
+::: {.fragment}
+They are undoubtedly the gold standard for data on the number of contacts.
+
+But they are prohibitively expensive, and logistically very challenging.
+:::
+
+## POLYMOD
+
+Published in 2008, Mossong et. al undertook a contact diary study of 7290 participants across Europe.
+
+_It remains the most widely cited contact diary study_.
+
+![](images/mossong-combined.png){fig-align="center"}
+
+## Contact matrix projection
+
+Prem et. al formed a model that predicts the number of contacts based on the age of participants.
+
+This model then allows for prediction to settings that are outside the original POLYMOD countries.
+
+## What is provided:
+
+::: {.columns}
+::: {.column width='50%'}
+![](images/prem-dir-mats.png){fig-align="center"}
+
+:::
+::: {.column width='50%'}
+![](images/prem-spreadsheet.png){fig-align="center"}
+
+:::
+:::
+
+## Our model of contact
+
+Not much information to train model. We use:
+
+$$\begin{aligned}
+c_{ij} = \beta_0 + \beta_1(|i-j|) + &\beta_2(|i-j|^2) + \beta_3(i\times j) + \beta_4(i+j) +\\ &\beta_5\max(i, j) + \beta_6\min(i, j)
+\end{aligned}
+$$
+
+::: {.fragment .callout-tip}
+## 🤓 Akshually 🤓
+
+We want to fit this as a generalised additive model, so _actually_ we have splines on these terms to satisfy the smoothness requirements.
+
+This is very similar to the approach by Prem et. al who perform post-hoc smoothing of the parameters after MCMC.
+:::
+
+## Model terms
+
+```{r}
+#| fig-align: center
+
+library(tidyverse)
+ages <- 1:100
+expand_grid(i = ages,
+            j = ages) %>%
+  mutate(
+    `feature |i - j|` = abs(i - j),
+    `feature |i - j|^2` = (i - j) ^ 2,
+    `feature i x j` = i * j,
+    `feature i + j` = i + j,
+    `feature max(i, j)` = pmax(i, j),
+    `feature min(i, j)` = pmin(i, j)
+    ) %>%
+  pivot_longer(
+    cols = starts_with("feature "),
+    names_to = "feature",
+    names_prefix = "feature",
+    values_to = "value"
+  ) %>%
+  group_by(
+    feature) %>%
+  mutate(
+    value = value / max(value)) %>%
+  ggplot(
+    aes(i,
+        j,
+        fill = value)
+  ) +
+  facet_wrap(~feature,
+             ncol = 3) +
+  geom_raster() +
+  scale_fill_viridis_c() +
+  theme_minimal() +
+  theme(axis.text = element_blank(), axis.ticks = element_blank()) +
+  labs(x = "Age (from)", y = "Age (to)")
+```
+
+## Projection onto target demography
+
+```{r}
+#| label: partial-plots-create
+#| echo: false
+#| fig-align: center
+
+fit_home <- polymod_setting_models$home
+age_grid <- create_age_grid(ages = 1:99)
+term_names <- extract_term_names(fit_home)
+term_var_names <- clean_term_names(term_names)
+age_predictions <- predict_individual_terms(
+  age_grid = age_grid,
+  fit = fit_home,
+  term_names = term_names,
+  term_var_names = term_var_names
+)
+
+age_predictions_all_settings <- map_dfr(
+  .x = polymod_setting_models,
+  .f = function(x) {
+    predict_individual_terms(
+      age_grid = age_grid,
+      fit = x,
+      term_names = term_names,
+      term_var_names = term_var_names
+    )
+  },
+  .id = "setting"
+)
+
+plot_age_term_settings <- gg_age_terms_settings(age_predictions_all_settings)
+age_predictions_long <- pivot_longer_age_preds(age_predictions)
+plot_age_predictions_long <- gg_age_partial_pred_long(age_predictions_long) +
+  coord_equal() +
+  labs(
+    x = "Age (from)",
+    y = "Age (to)"
+    ) + 
+  theme(
+    legend.position = "bottom",
+    axis.text = element_text(size = 6),
+    panel.spacing = unit(x = 1, units = "lines")
+  ) +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0)) +
+  expand_limits(x = c(0, 100), y = c(0, 100))
+
+age_predictions_long_sum <- add_age_partial_sum(age_predictions_long)
+plot_age_predictions_sum <- gg_age_partial_sum(age_predictions_long_sum) + coord_equal() +
+  labs(x = "Age (from)",
+       y = "Age (to)") +
+  theme(
+    legend.position = "bottom"
+  ) +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0)) +
+  expand_limits(x = c(0, 100), y = c(0, 100))
+
+plot_all_terms_sum <- plot_age_predictions_long +
+  plot_age_predictions_sum + 
+  plot_layout(design = "
+            AAAAABBBB
+            AAAAABBBB
+            AAAAABBBB
+            AAAAABBBB
+            ") + 
+  plot_annotation(
+    tag_levels = "A"
+  )
+  
+
+plot_all_terms_sum
+```
+
+## Importance of contact diary study
+
+We've used POLYMOD-trained models for over a decade.
+
+There are 44 other surveys available in one collection on [Zenodo](https://zenodo.org/communities/social_contact_data/records), and probably more out there in the wild.
+
+::: {.fragment}
+Some recent work from [Harris et. al](https://arxiv.org/abs/2406.01639) has shown that differences in the survey design can have a significant impact on these synthetic contact matrices.
+:::
+
+::: {.fragment .callout-tip}
+`conmat` allows for training on survey of choice, and projection onto target demographic of choice
+:::
+
+## Example of using a different study {auto-animate="true"}
+
+```{r}
+#| echo: true
+#| eval: false
+
+china_survey <- socialmixr::get_survey("https://doi.org/10.5281/zenodo.3878754") |>
+    summarise(contacts = sum(cnt_home))
+
+china_pop <- read_csv("./data/china_pop_age_dist.csv")
+china_pop_cm <- conmat::as_conmat_population(
+  data = china_pop,
+  age = lower.age.limit,
+  population = population
+)
+```
+
+
+## Example of using a different study {auto-animate="true"}
+
+```{r}
+#| echo: true
+#| eval: false
+
+china_survey <- socialmixr::get_survey("https://doi.org/10.5281/zenodo.3878754") |>
+    summarise(contacts = sum(cnt_home))
+
+china_pop <- read_csv("./data/china_pop_age_dist.csv")
+china_pop_cm <- conmat::as_conmat_population(
+  data = china_pop,
+  age = lower.age.limit,
+  population = population
+)
+
+model <- conmat::fit_single_contact_model(
+    contact_data = china_survey,
+    population = china_pop_cm
+)
+
+predicted_contacts <- conmat::predict_contacts(
+    model = model,
+    population = china_pop_cm,
+    age_breaks = c(seq(0, 80, by = 5), Inf)
+)
+```
+
+## Why input survey matters
+
+These matrices are for a Chinese population, using a Chinese survey (left) and POLYMOD (right), for the home setting.
+
+```{r}
+#| fig-align: center
+
+plot_comparisons <- function(fit_list, settings) {
+  fit_names <- names(fit_list)
+
+  home <- map2_dfr(fit_list, fit_names, .f = function(x, y) { 
+    x$home |> mutate(survey_location = y) } 
+  ) |> mutate(setting = "home")
+
+  work <- map2_dfr(fit_list, fit_names, .f = function(x, y) { 
+    x$work |> mutate(survey_location = y) } 
+  ) |> mutate(setting = "work")
+
+  school <- map2_dfr(fit_list, fit_names, .f = function(x, y) { 
+    x$school |> mutate(survey_location = y) } 
+  ) |> mutate(setting = "school")
+
+  all_settings <- bind_rows(
+    home, work, school
+  )
+  
+  all_settings |>
+    filter(setting %in% settings) |>
+    ggplot(aes(x=age_group_from, y = age_group_to, fill = contacts)) +
+      geom_tile() +
+      coord_fixed() +
+      scale_fill_distiller(direction = 1, trans = "sqrt") +
+      theme_minimal() +
+      theme(axis.text = element_text(size = 6, angle = 45, hjust = 1)) +
+      facet_grid(setting ~ survey_location) +
+      labs(x = "Age (from)", y = "Age (to)", fill = "Contacts")
+}
+
+plot_comparisons(fit_list[c("china", "polymod")], settings = c("home"))
+```
+
+## Why input survey matters
+
+These matrices are for a Chinese population, using a Chinese survey (left) and POLYMOD (right), for the home setting.
+
+```{r}
+#| fig-align: center
+
+polygons <- tibble::tribble(
+    ~x, ~y, ~xend, ~yend,
+    "[0,5)", "[50,55)", "[0,5)", "[70,75)",
+    "[0,5)", "[70,75)", "[15,20)", "[80,Inf)",
+    "[15,20)", "[80,Inf)", "[30,35)", "[80,Inf)", 
+    "[30,35)", "[80,Inf)", "[30,35)", "[70,75)",
+    "[30,35)", "[70,75)", "[0,5)", "[50,55)",
+    "[45,50)", "[0,5)", "[80,Inf)", "[35,40)",
+    "[80,Inf)", "[35,40)", "[80,Inf)", "[0,5)",
+    "[80,Inf)", "[0,5)", "[45,50)", "[0,5)"
+) |>
+    mutate(across(everything(), as.factor))
+
+plot_comparisons(fit_list[c("china", "polymod")], settings = c("home")) +
+    geom_segment(aes(x = x, y = y, xend = xend, yend = yend), colour = "red", data = polygons, inherit.aes = FALSE)
+```
+
+## Summary
+
+`conmat` is a new, open-source, programmable system to generate synthetic contact matrices
+
+::: {.incremental}
+* Can use arbitrary contact survey and arbitrary demography
+* Convenience functions for next generation matrices, numbers of contacts
+* Choice of input survey _is crucial_:
+    * These models have no information on terms like "intergenerational mixing"
+:::
+
+## Summary
+
+`conmat` is a new, open-source, programmable system to generate synthetic contact matrices
+
+Available right now:
+
+```{r}
+#| eval: false
+#| echo: true
+
+remotes::install_github("idem-lab/conmat")
+```
+
+or pre-computed matrices on Zenodo: [https://zenodo.org/records/12776714](https://zenodo.org/records/12776714)
+
+## Acknowledgements
+
+::: {layout-nrow=1}
+
+![Chitra Saraswati](images/chitra-saraswati.png)
+
+![Aarathy Babu](images/aarathy-babu.jpg)
+
+![Nick Tierney](images/nick-tierney.jpg)
+
+![Nick Golding](images/nick-golding.jpg)
+
+:::
+
+SPECTRUM-SPARK Seed Funding
