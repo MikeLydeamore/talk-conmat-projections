@@ -5,7 +5,6 @@ date: today
 format:
     presentation-revealjs+letterbox:
         fig-align: center
-    presentation-beamer: default
 ---
 
 ```{css}
@@ -75,10 +74,10 @@ This model then allows for prediction to settings that are outside the original 
 
 ## Our model of contact
 
-Not much information to train model. We use:
+Not much information to train model. We model the number of contacts an individual in bin $i$ has with bin $j$:
 
 $$\begin{aligned}
-c_{ij} = \beta_0 + \beta_1(|i-j|) + &\beta_2(|i-j|^2) + \beta_3(i\times j) + \beta_4(i+j) +\\ &\beta_5\max(i, j) + \beta_6\min(i, j)
+c_{ij} = \beta_{0,i} + \beta_1(|i-j|) + &\beta_2(|i-j|^2) + \beta_3(i\times j) + \beta_4(i+j) +\\ &\beta_5\max(i, j) + \beta_6\min(i, j)
 \end{aligned}
 $$
 
