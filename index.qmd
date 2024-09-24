@@ -66,7 +66,7 @@ _It remains the most widely cited contact diary study_.
 
 ## Contact matrix projection
 
-Prem et. al formed a model that predicts the number of contacts based on the age of participants.
+Prem et. al formed a model that predicts the number of contacts based on the age structure of the population.
 
 This model then allows for prediction to settings that are outside the original POLYMOD countries.
 
