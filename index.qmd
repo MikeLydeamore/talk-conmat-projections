@@ -30,6 +30,17 @@ fit_list <- readRDS("data/fit_list.rds")
 
 ## What are contact matrices
 
+* Estimates of the numbers of contact between individuals in various categories
+* Used in models to investigate:
+  * Effect of NPIs
+  * Understand effects of demographic changes
+  * "More accurately" estimate transmission
+
+::: {.fragment}
+But how do they come about!?
+:::
+
+
 ## Contact diary studies
 
 Contact diary studies follow individuals and ask them:
