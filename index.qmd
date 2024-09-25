@@ -11,6 +11,10 @@ format:
 figcaption {
     text-align: center;
 }
+
+.center {
+  text-align: center;
+}
 ```
 
 ```{r}
@@ -27,6 +31,17 @@ library(patchwork)
 
 fit_list <- readRDS("data/fit_list.rds")
 ```
+
+![](images/massiveplug.webp){fig-align="center"}
+
+::: {.fragment}
+### Open the World with Open Source {.center}
+
+Learn and discuss new open source tools for business analytics and data science!
+
+#### Register at [https://wombat2024.numbat.space/](https://wombat2024.numbat.space/) {.center}
+:::
+
 
 ## What are contact matrices
 
