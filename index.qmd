@@ -397,3 +397,9 @@ or pre-computed matrices on Zenodo: [https://zenodo.org/records/12776714](https:
 :::
 
 SPECTRUM-SPARK Seed Funding
+
+::: footer
+
+Code and slides are available at [https://github.com/MikeLydeamore/talk-conmat-projections](https://github.com/MikeLydeamore/talk-conmat-projections)
+
+:::
